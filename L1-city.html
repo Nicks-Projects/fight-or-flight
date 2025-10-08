@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Level 1: The City</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: url('https://t3.ftcdn.net/jpg/07/48/90/96/360_F_748909611_QVAvQqUDmHb8HV5TTG593bTgf7JsmrbQ.jpg') no-repeat center bottom fixed;
+    background-size: cover;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    background-color: rgba(0,0,0,0.25);
+  }
+  #world {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    white-space: nowrap;
+    transition: transform 0.1s linear;
+    will-change: transform;
+  }
+  .platform {
+    position: absolute;
+    background: #ccc;
+    height: 20px;
+    border-radius: 5px 5px 0 0;
+    box-sizing: border-box;
+  }
+  .beam {
+    position: absolute;
+    bottom: -150px;
+    width: 12px;
+    background: grey;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 150px;
+    border-radius: 0 0 4px 4px;
+  }
+  #player {
+    position: absolute;
+    width: 32px; height: 32px;
+    background: red;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(255, 0, 0, 0.7);
+  }
+  #wind {
+    position: absolute;
+    top: 20%;
+    width: 80px; height: 50px;
+    background:
+      radial-gradient(circle at 40% 50%, rgba(255,255,255,0.6), transparent 70%);
+    border-radius: 50% / 60% 60% 40% 40%;
+    opacity: 0;
+    filter: blur(4px);
+    animation: wind-move 3s linear infinite;
+  }
+  @keyframes wind-move {
+    0% { left: -100px; opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { left: 110vw; opacity: 0.5; }
+  }
+  #paperCup {
+    position: absolute;
+    top: 50%;
+    width: 40px; height: 40px;
+    background: url('https://i.imgur.com/u4bUPRH.png') no-repeat center/contain;
+    opacity: 0;
+    filter: drop-shadow(0 0 1px black);
+  }
+  #fallOverlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: black;
+    opacity: 0;
+    visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    transition: opacity 0.7s ease;
+    color: white;
+    font-size: 2rem;
+    text-align: center;
+  }
+  #fallOverlay img {
+    max-width: 300px;
+    pointer-events: none;
+  }
+  #fallOverlay h2 {
+    margin-top: 20px;
+    margin-bottom: 30px;
+    text-shadow: 0 0 6px #ff0000;
+  }
+  #fallOverlay button {
+    margin: 10px 15px;
+    padding: 15px 30px;
+    font-size: 1.25rem;
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    background: crimson;
+    color: white;
+    transition: background-color 0.3s;
+  }
+  #fallOverlay button:hover {
+    background-color: #ff4c4c;
+  }
+  #keyPartSpotlight {
+    position: absolute;
+    width: 150px; height: 150px;
+    background: radial-gradient(circle, rgba(255,255,200,0.8) 50%, rgba(255,255,180,0.7) 80%, transparent 90%);
+    border-radius: 50%;
+    box-shadow: 0 0 20px 10px yellow;
+    display: none;
+    cursor: pointer;
+    z-index: 20;
+  }
+  #keyPartMessage {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    border-radius: 20px;
+    padding: 40px 50px;
+    color: white;
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-align: center;
+    display: none;
+    z-index: 1000;
+  }
+  #keyPartMessage button {
+    margin-top: 25px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    padding: 15px 40px;
+    border-radius: 20px;
+    border: none;
+    background: #ffcc00;
+    color: black;
+    cursor: pointer;
+    box-shadow: 0 0 15px #ffcc00;
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  #keyPartMessage button:hover {
+    background-color: #ffd633;
+    box-shadow: 0 0 25px #ffe066;
+  }
+</style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div id="world"></div>
+    <div id="player"></div>
+    <div id="wind"></div>
+    <div id="paperCup"></div>
+    <div id="keyPartSpotlight" title="Key Part 1"></div>
+  </div>
+
+  <div id="fallOverlay">
+    <img src="https://media.tenor.com/wsbmWYxnJYQAAAAM/kermit-falling.gif" alt="Falling gif" />
+    <h2>You Fell Off A Beam</h2>
+    <div>
+      <button id="retryBtn">Try Again?</button>
+      <button id="returnBtn">Return To Level Select</button>
+    </div>
+  </div>
+  <div id="keyPartMessage">
+    You've acquired key part 1!
+    <button id="continueBtn">Continue</button>
+  </div>
+
+<script>
+(() => {
+  const world = document.getElementById('world');
+  const player = document.getElementById('player');
+  const wind = document.getElementById('wind');
+  const paperCup = document.getElementById('paperCup');
+  const fallOverlay = document.getElementById('fallOverlay');
+  const retryBtn = document.getElementById('retryBtn');
+  const returnBtn = document.getElementById('returnBtn');
+  const keyPartSpotlight = document.getElementById('keyPartSpotlight');
+  const keyPartMessage = document.getElementById('keyPartMessage');
+  const continueBtn = document.getElementById('continueBtn');
+
+  const gravity = 0.7;
+  const jumpForce = 14;
+  const moveSpeed = 6;
+  const worldWidth = 8000;
+
+  let cameraX = 0;
+
+  let px = 0;
+  let py = 0;
+  let vy = 0;
+  let onGround = false;
+
+  const keys = {left:false, right:false, up:false};
+
+  const minPlatformWidth = 100;
+  const maxPlatformWidth = 280;
+  const minGap = 70;
+  const maxGap = 150;
+  const platformHeight = 20;
+  const platformMinY = 120;
+  const platformMaxY = 260;
+
+  let platforms = [];
+
+  function generatePlatforms() {
+    platforms = [];
+    const firstWidth = 150 + Math.random() * 150;
+    const firstY = 200 + (Math.random() * 30 - 15);
+    platforms.push({x: 0, width: firstWidth, y: firstY});
+
+    while (platforms[platforms.length-1].x + platforms[platforms.length-1].width < worldWidth) {
+      let lastPlat = platforms[platforms.length-1];
+      let gap = minGap + Math.random() * (maxGap - minGap);
+      let newX = lastPlat.x + lastPlat.width + gap;
+      let prevY = lastPlat.y;
+      const maxJumpUp = 65;
+      const maxFallDown = 45;
+      let newY = prevY + (Math.random() * (maxJumpUp + maxFallDown) - maxFallDown);
+      if(newY < platformMinY) newY = platformMinY + Math.random()*20;
+      if(newY > platformMaxY) newY = platformMaxY - Math.random()*20;
+      let newWidth = minPlatformWidth + Math.random() * (maxPlatformWidth - minPlatformWidth);
+      platforms.push({x: newX, width: newWidth, y: newY});
+    }
+  }
+
+  function renderPlatforms() {
+    world.innerHTML = '';
+    platforms.forEach(p => {
+      const plat = document.createElement('div');
+      plat.className = 'platform';
+      plat.style.width = p.width + 'px';
+      plat.style.height = platformHeight + 'px';
+      plat.style.left = p.x + 'px';
+      plat.style.bottom = p.y + 'px';
+
+      const beam = document.createElement('div');
+      beam.className = 'beam';
+      plat.appendChild(beam);
+
+      world.appendChild(plat);
+    });
+  }
+
+  // Horizontal collision prevents entering inside vertically overlapping platforms
+  function horizontalCollisionCheck(newPx, py) {
+    const playerTop = py + 32;
+    const playerBottom = py;
+    for(let platform of platforms) {
+      const platTop = platform.y + platformHeight;
+      const platBottom = platform.y;
+      if(!(playerTop <= platBottom || playerBottom >= platTop)) { // vertical overlap test
+        const platLeft = platform.x;
+        const platRight = platform.x + platform.width;
+        if(!(newPx + 32 <= platLeft || newPx >= platRight)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Vertical collision for landing
+  function verticalCollisionCheck(newPx, newPy) {
+    const footY = newPy;
+    for(let platform of platforms) {
+      const platTop = platform.y + platformHeight;
+      if (
+        footY <= platTop + 3 && footY >= platform.y &&
+        newPx + 32 > platform.x &&
+        newPx < platform.x + platform.width &&
+        vy >= -0.5 // allow small negative vy to snap to platform top on landing
+      ) {
+        return platTop;
+      }
+    }
+    return null;
+  }
+
+  let cupActive = false;
+  let cupX = window.innerWidth;
+  let cupY = 0;
+  let cupSpeed = 8;
+
+  function positionKeyPart() {
+    const lastPlat = platforms[platforms.length - 1];
+    const keyX = lastPlat.x + lastPlat.width / 2 - 75;
+    const keyY = lastPlat.y + platformHeight + 15;
+    keyPartSpotlight.style.left = keyX + 'px';
+    keyPartSpotlight.style.bottom = keyY + 'px';
+    keyPartSpotlight.style.display = 'block';
+  }
+
+  let keyCollected = false;
+
+  function updatePlayerPos() {
+    player.style.left = px + 'px';
+    player.style.bottom = py + 'px';
+  }
+
+  function gameLoop() {
+    if(keyCollected) return;
+
+    let newPx = px;
+    if(keys.left) newPx -= moveSpeed;
+    if(keys.right) newPx += moveSpeed;
+
+    if(!horizontalCollisionCheck(newPx, py)) {
+      px = newPx;
+    }
+
+    vy -= gravity;
+    let newPy = py + vy;
+
+    const landY = verticalCollisionCheck(px, newPy);
+    if(landY !== null) {
+      py = landY;
+      vy = 0;
+      onGround = true;
+    } else {
+      py = newPy;
+      onGround = false;
+    }
+
+    if(keys.up && onGround) {
+      vy = jumpForce;
+      onGround = false;
+    }
+
+    updatePlayerPos();
+
+    if(px > window.innerWidth * 0.6) {
+      cameraX = px - window.innerWidth * 0.6;
+    }
+    if(cameraX < 0) cameraX = 0;
+    if(cameraX > worldWidth - window.innerWidth) cameraX = worldWidth - window.innerWidth;
+    world.style.transform = `translateX(${-cameraX}px)`;
+    keyPartSpotlight.style.transform = `translateX(${-cameraX}px)`;
+
+    if(py < 0) {
+      triggerFallScreen();
+      return;
+    }
+
+    if(!cupActive && Math.random() < 0.003) {
+      cupActive = true;
+      cupX = window.innerWidth;
+      cupY = window.innerHeight * (0.4 + Math.random() * 0.3);
+      paperCup.style.top = cupY + 'px';
+      paperCup.style.left = cupX + 'px';
+      paperCup.style.opacity = '1';
+    }
+    if(cupActive) {
+      cupX -= cupSpeed;
+      paperCup.style.left = cupX + 'px';
+
+      const playerRect = player.getBoundingClientRect();
+      const cupRect = paperCup.getBoundingClientRect();
+
+      if(!(cupRect.right < playerRect.left || cupRect.left > playerRect.right ||
+          cupRect.bottom < playerRect.top || cupRect.top > playerRect.bottom)) {
+        px -= 60;
+        if(px < 50) px = 50;
+        cupActive = false;
+        paperCup.style.opacity = '0';
+        vy = 10;
+        onGround = false;
+      }
+
+      if(cupX < -50) {
+        cupActive = false;
+        paperCup.style.opacity = '0';
+      }
+    }
+
+    const keyRect = keyPartSpotlight.getBoundingClientRect();
+    const playerRect = player.getBoundingClientRect();
+    if(!keyCollected &&
+       !(keyRect.right < playerRect.left || keyRect.left > playerRect.right ||
+         keyRect.bottom < playerRect.top || keyRect.top > playerRect.bottom)) {
+      collectKeyPart();
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function collectKeyPart() {
+    keyCollected = true;
+    keyPartMessage.style.display = 'block';
+  }
+
+  continueBtn.onclick = () => {
+    let keyParts = JSON.parse(localStorage.getItem('keyParts') || '[]');
+    if(!keyParts.includes(1)) keyParts.push(1);
+    localStorage.setItem('keyParts', JSON.stringify(keyParts));
+
+    keyPartMessage.innerHTML = `You have ${keyParts.length} of 4 key parts!<br>Find the other ${4 - keyParts.length}.<br><br><button id="continueToSelect">Continue</button>`;
+
+    document.getElementById('continueToSelect').onclick = () => {
+      window.location.href = 'LVLSLCT.html';
+    };
+  };
+
+  function triggerFallScreen() {
+    fallOverlay.style.visibility = 'visible';
+    fallOverlay.style.opacity = '1';
+  }
+
+  retryBtn.onclick = () => {
+    fallOverlay.style.opacity = '0';
+    setTimeout(() => {
+      fallOverlay.style.visibility = 'hidden';
+      keyCollected = false;
+      generatePlatforms();
+      renderPlatforms();
+      positionKeyPart();
+      const firstPlat = platforms[0];
+      const spawnMargin = 12; // spawn 12px above platform top to prevent clipping
+      px = firstPlat.x + 20;
+      py = firstPlat.y + platformHeight + spawnMargin;
+      vy = 0;
+      cameraX = 0;
+      updatePlayerPos();
+      world.style.transform = 'translateX(0)';
+      keyPartSpotlight.style.transform = 'translateX(0)';
+      paperCup.style.opacity = '0';
+      cupActive = false;
+      gameLoop();
+    }, 700);
+  };
+
+  returnBtn.onclick = () => {
+    window.location.href = 'LVLSLCT.html';
+  };
+
+  window.addEventListener('keydown', e => {
+    if(e.key === 'ArrowLeft') keys.left = true;
+    else if(e.key === 'ArrowRight') keys.right = true;
+    else if(e.key === 'ArrowUp') keys.up = true;
+  });
+  window.addEventListener('keyup', e => {
+    if(e.key === 'ArrowLeft') keys.left = false;
+    else if(e.key === 'ArrowRight') keys.right = false;
+    else if(e.key === 'ArrowUp') keys.up = false;
+  });
+
+  generatePlatforms();
+  renderPlatforms();
+  positionKeyPart();
+
+  const firstPlat = platforms[0];
+  const marginAbovePlatform = 12;
+  px = firstPlat.x + 20;
+  py = firstPlat.y + platformHeight + marginAbovePlatform;
+  vy = 0;
+  updatePlayerPos();
+
+  gameLoop();
+})();
+</script>
+</body>
+</html>
