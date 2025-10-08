@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Level Select - Fight or Flight</title>
+<style>
+  /* Reset & base */
+  body, html {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: linear-gradient(to bottom, #87cefa, #4a90e2); /* Sky blue */
+    font-family: Arial, sans-serif;
+    user-select: none;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Ocean */
+  #ocean {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100vw; height: 80px;
+    background: linear-gradient(to top, #004577, #0099cc);
+    box-shadow: inset 0 10px 20px #002d54;
+    z-index: 0;
+  }
+
+  /* Island with grass texture */
+  #island {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 820px;
+    height: 185px;
+    background:
+      radial-gradient(circle at 60% 30%, #4a6921 15%, transparent 40%),
+      radial-gradient(circle at 40% 50%, #587c27 15%, transparent 43%),
+      radial-gradient(circle at 25% 75%, #3f5f1a 20%, transparent 45%),
+      radial-gradient(circle at 70% 70%, #4c6f1e 18%, transparent 46%),
+      linear-gradient(to top, #3f5f0f 20%, #708c27 50%, #a1bd3e 80%);
+    border-radius: 140px / 70px; /* Oval shape */
+    box-shadow:
+      inset 0 15px 40px rgba(0,0,0,0.35),
+      0 7px 15px rgba(0,0,0,0.3);
+    z-index: 1;
+  }
+
+  /* Player red square */
+  #player {
+    position: absolute;
+    width: 32px; height: 32px;
+    background: red;
+    border-radius: 6px;
+    bottom: 120px;
+    left: calc(50% - 16px);
+    z-index: 5;
+    transition: left 0.12s linear, bottom 0.12s linear;
+    box-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
+  }
+
+  /* Level circles */
+  .level-circle {
+    position: absolute;
+    width: 50px; height: 50px;
+    background: crimson;
+    border-radius: 50%;
+    box-shadow:
+      0 0 10px crimson,
+      inset 0 0 10px #ff6666;
+    cursor: pointer;
+    z-index: 4;
+    transition: transform 0.3s ease;
+  }
+  .level-circle:hover {
+    transform: scale(1.1);
+  }
+  /* Circle positions */
+  #lvl1 { bottom: 130px; left: calc(50% - 320px); }
+  #lvl2 { bottom: 135px; left: calc(50% - 130px); }
+  #lvl3 { bottom: 140px; left: calc(50% + 50px); }
+  #lvl4 { bottom: 130px; left: calc(50% + 310px); }
+
+  /* Info Panel */
+  #infoPanel {
+    position: absolute;
+    bottom: 200px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.75);
+    padding: 20px 32px;
+    border-radius: 18px;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+    display: none;
+    z-index: 6;
+    width: 260px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.7);
+    text-align: center;
+  }
+  #infoPanel button {
+    margin-top: 15px;
+    font-weight: bold;
+    padding: 10px 24px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    background-color: crimson;
+    color: white;
+    box-shadow: 0 0 6px crimson;
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  #infoPanel button:hover:not(:disabled) {
+    background-color: #ff4444;
+    box-shadow: 0 0 15px #ff6666;
+  }
+  #infoPanel button:disabled {
+    background-color: gray;
+    cursor: default;
+    box-shadow: none;
+  }
+
+  /* Floating island (final level) */
+  #floatingIsland {
+    position: absolute;
+    bottom: 300px;
+    left: 50%;
+    width: 320px;
+    height: 160px;
+    background:
+      radial-gradient(circle at 50% 50%, #557700, #335500);
+    border-radius: 160px / 90px;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, 100vh);
+    opacity: 0;
+    transition: opacity 2s ease, transform 3s ease;
+    z-index: 7;
+    cursor: pointer;
+  }
+  /* Bridge */
+  #bridge {
+    position: absolute;
+    bottom: 230px;
+    left: 50%;
+    width: 260px;
+    height: 42px;
+    background: linear-gradient(90deg, #865e22, #d4a148);
+    border-radius: 22px;
+    opacity: 0;
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: opacity 2s ease, transform 2s ease;
+    z-index: 8;
+    cursor: pointer;
+    box-shadow: inset 0 4px 6px #a07a30;
+  }
+  /* Final level prompt */
+  #finalLevelPrompt {
+    position: absolute;
+    bottom: 480px;
+    left: 50%;
+    transform: translate(-50%, 0);
+    color: white;
+    font-size: 1.8rem;
+    opacity: 0;
+    transition: opacity 2s ease;
+    z-index: 9;
+    font-weight: bold;
+    text-shadow: 0 0 12px black;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div id="ocean"></div>
+    <div id="island"></div>
+
+    <div id="player"></div>
+
+    <!-- Level Circles -->
+    <div id="lvl1" class="level-circle" data-level="1" data-name="Level 1: The City" data-link="L1-city.html"></div>
+    <div id="lvl2" class="level-circle" data-level="2" data-name="Level 2: Apocalypse" data-link="L2-apo.html"></div>
+    <div id="lvl3" class="level-circle" data-level="3" data-name="Level 3: Mystery Man, Hide & Seek" data-link="L3-H&S.html"></div>
+    <div id="lvl4" class="level-circle" data-level="4" data-name="Level 4: 2 Minutes Of Hell" data-link="L4-hell.html"></div>
+
+    <!-- Info Panel -->
+    <div id="infoPanel">
+      <div id="levelName"></div>
+      <button id="beginBtn">Begin</button>
+    </div>
+
+    <!-- Floating island and bridge for final cutscene -->
+    <div id="floatingIsland" title="Level 5: Boss"></div>
+    <div id="bridge" title="Bridge to Level 5"></div>
+    <div id="finalLevelPrompt">Level 5: Boss</div>
+  </div>
+
+<script>
+(() => {
+  const player = document.getElementById('player');
+  const island = document.getElementById('island');
+  const circles = document.querySelectorAll('.level-circle');
+  const infoPanel = document.getElementById('infoPanel');
+  const levelName = document.getElementById('levelName');
+  const beginBtn = document.getElementById('beginBtn');
+  const floatingIsland = document.getElementById('floatingIsland');
+  const bridge = document.getElementById('bridge');
+  const finalLevelPrompt = document.getElementById('finalLevelPrompt');
+
+  const islandRect = island.getBoundingClientRect();
+  const islandLeft = islandRect.left;
+  const islandRight = islandRect.right;
+  const islandTop = islandRect.top;
+  const islandBottom = islandRect.bottom;
+
+  const playerSize = 32;
+  // Initialize player position near center of island horizontally and vertically
+  let playerX = window.innerWidth / 2 - playerSize / 2;
+  let playerY = islandBottom - playerSize - 20;
+
+  const step = 10;
+
+  // Load completed levels from localStorage or empty set
+  const completedLevels = new Set(JSON.parse(localStorage.getItem('completedLevels') || '[]'));
+
+  // Save completed levels to localStorage
+  function saveCompletedLevels() {
+    localStorage.setItem('completedLevels', JSON.stringify(Array.from(completedLevels)));
+  }
+
+  // Position the player visually
+  function updatePlayerPos() {
+    player.style.left = playerX + 'px';
+    player.style.bottom = (window.innerHeight - playerY - playerSize) + 'px';
+  }
+
+  // Check if the player is on island (oval shape check)
+  function isOnIsland(x, y) {
+    const islandCenterX = (islandLeft + islandRight) / 2;
+    const islandCenterY = (islandTop + islandBottom) / 2;
+    const radiusX = (islandRight - islandLeft) / 2 - playerSize / 2;
+    const radiusY = (islandBottom - islandTop) / 2 - playerSize / 1.5;
+
+    const dx = x + playerSize / 2 - islandCenterX;
+    const dy = y + playerSize / 2 - islandCenterY;
+
+    return ((dx*dx)/(radiusX*radiusX) + (dy*dy)/(radiusY*radiusY)) <= 1;
+  }
+
+  // Detect if player is standing on a level circle (within 30px)
+  function getCircleUnderPlayer() {
+    for (let circle of circles) {
+      const rect = circle.getBoundingClientRect();
+      const circleCenterX = rect.left + rect.width / 2;
+      const circleCenterY = rect.top + rect.height / 2;
+
+      const playerCenterX = playerX + playerSize / 2;
+      const playerCenterY = playerY + playerSize / 2;
+
+      const dist = Math.hypot(circleCenterX - playerCenterX, circleCenterY - playerCenterY);
+
+      if (dist <= 30) {
+        return circle;
+      }
+    }
+    return null;
+  }
+
+  let shownCircle = null;
+  let floatingIslandUnlocked = false;
+
+  // Display info panel for the given circle or hide it
+  function showInfo(circle) {
+    if (!circle) {
+      infoPanel.style.display = 'none';
+      return;
+    }
+    const name = circle.dataset.name;
+    const lvl = circle.dataset.level;
+    levelName.textContent = name;
+    infoPanel.style.display = 'block';
+
+    // Enable begin button always (could disable after completed if wanted)
+    beginBtn.disabled = false;
+    beginBtn.textContent = 'Begin';
+
+    beginBtn.onclick = () => {
+      // Mark level complete and save
+      completedLevels.add(lvl);
+      saveCompletedLevels();
+
+      // Redirect to level page
+      window.location.href = circle.dataset.link;
+    };
+  }
+
+  // Animate final island and bridge reveal
+  function unlockFinalIsland() {
+    floatingIslandUnlocked = true;
+    floatingIsland.style.transform = 'translate(-50%, 0)';
+    floatingIsland.style.opacity = '1';
+
+    setTimeout(() => {
+      bridge.style.opacity = '1';
+      bridge.style.transform = 'scaleX(1)';
+    }, 2000);
+
+    setTimeout(() => {
+      finalLevelPrompt.style.opacity = 1;
+    }, 3500);
+
+    floatingIsland.onclick = () => { window.location.href = 'LB'; };
+    finalLevelPrompt.onclick = () => { window.location.href = 'LB'; };
+    bridge.onclick = () => { window.location.href = 'LB'; };
+  }
+
+  // On load, if all four levels complete unlock final level
+  if (completedLevels.size === 4) {
+    unlockFinalIsland();
+  }
+
+  // Handle arrow key input for player movement
+  window.addEventListener('keydown', (e) => {
+    let prevX = playerX;
+    let prevY = playerY;
+    switch(e.key) {
+      case 'ArrowUp':    playerY -= step; break;
+      case 'ArrowDown':  playerY += step; break;
+      case 'ArrowLeft':  playerX -= step; break;
+      case 'ArrowRight': playerX += step; break;
+      default: return; // ignore other keys
+    }
+    if (!isOnIsland(playerX, playerY)) {
+      playerX = prevX;
+      playerY = prevY;
+    }
+    updatePlayerPos();
+
+    const currentCircle = getCircleUnderPlayer();
+    if (currentCircle !== shownCircle) {
+      shownCircle = currentCircle;
+      showInfo(currentCircle);
+    }
+  });
+
+  updatePlayerPos();
+  infoPanel.style.display = 'none';
+})();
+</script>
+</body>
+</html>
