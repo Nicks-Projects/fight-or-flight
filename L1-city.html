@@ -163,7 +163,6 @@
     <div id="paperCup"></div>
     <div id="keyPartSpotlight" title="Key Part 1"></div>
   </div>
-
   <div id="fallOverlay">
     <img src="https://media.tenor.com/wsbmWYxnJYQAAAAM/kermit-falling.gif" alt="Falling gif" />
     <h2>You Fell Off A Beam</h2>
@@ -176,7 +175,6 @@
     You've acquired key part 1!
     <button id="continueBtn">Continue</button>
   </div>
-
 <script>
 (() => {
   const world = document.getElementById('world');
@@ -189,37 +187,29 @@
   const keyPartSpotlight = document.getElementById('keyPartSpotlight');
   const keyPartMessage = document.getElementById('keyPartMessage');
   const continueBtn = document.getElementById('continueBtn');
-
   const gravity = 0.7;
   const jumpForce = 14;
   const moveSpeed = 6;
   const worldWidth = 8000;
-
   let cameraX = 0;
-
   let px = 0;
   let py = 0;
   let vy = 0;
   let onGround = false;
-
   const keys = {left:false, right:false, up:false};
-
   const minPlatformWidth = 100;
   const maxPlatformWidth = 280;
   const minGap = 70;
   const maxGap = 150;
   const platformHeight = 20;
-  const platformMinY = 120;
+  const platformMinY = 120;  // Fixed low vertical position for the first platform
   const platformMaxY = 260;
-
   let platforms = [];
-
   function generatePlatforms() {
     platforms = [];
-    const firstWidth = 150 + Math.random() * 150;
-    const firstY = 200 + (Math.random() * 30 - 15);
+    const firstWidth = 170 + Math.random() * 60;
+    const firstY = platformMinY; // Fixed low start so it's never too high
     platforms.push({x: 0, width: firstWidth, y: firstY});
-
     while (platforms[platforms.length-1].x + platforms[platforms.length-1].width < worldWidth) {
       let lastPlat = platforms[platforms.length-1];
       let gap = minGap + Math.random() * (maxGap - minGap);
@@ -234,7 +224,6 @@
       platforms.push({x: newX, width: newWidth, y: newY});
     }
   }
-
   function renderPlatforms() {
     world.innerHTML = '';
     platforms.forEach(p => {
@@ -244,23 +233,19 @@
       plat.style.height = platformHeight + 'px';
       plat.style.left = p.x + 'px';
       plat.style.bottom = p.y + 'px';
-
       const beam = document.createElement('div');
       beam.className = 'beam';
       plat.appendChild(beam);
-
       world.appendChild(plat);
     });
   }
-
-  // Horizontal collision prevents entering inside vertically overlapping platforms
   function horizontalCollisionCheck(newPx, py) {
     const playerTop = py + 32;
     const playerBottom = py;
     for(let platform of platforms) {
       const platTop = platform.y + platformHeight;
       const platBottom = platform.y;
-      if(!(playerTop <= platBottom || playerBottom >= platTop)) { // vertical overlap test
+      if(!(playerTop <= platBottom || playerBottom >= platTop)) {
         const platLeft = platform.x;
         const platRight = platform.x + platform.width;
         if(!(newPx + 32 <= platLeft || newPx >= platRight)) {
@@ -270,8 +255,6 @@
     }
     return false;
   }
-
-  // Vertical collision for landing
   function verticalCollisionCheck(newPx, newPy) {
     const footY = newPy;
     for(let platform of platforms) {
@@ -280,19 +263,17 @@
         footY <= platTop + 3 && footY >= platform.y &&
         newPx + 32 > platform.x &&
         newPx < platform.x + platform.width &&
-        vy >= -0.5 // allow small negative vy to snap to platform top on landing
+        vy >= -0.5
       ) {
         return platTop;
       }
     }
     return null;
   }
-
   let cupActive = false;
   let cupX = window.innerWidth;
   let cupY = 0;
   let cupSpeed = 8;
-
   function positionKeyPart() {
     const lastPlat = platforms[platforms.length - 1];
     const keyX = lastPlat.x + lastPlat.width / 2 - 75;
@@ -301,28 +282,34 @@
     keyPartSpotlight.style.bottom = keyY + 'px';
     keyPartSpotlight.style.display = 'block';
   }
-
   let keyCollected = false;
-
   function updatePlayerPos() {
     player.style.left = px + 'px';
     player.style.bottom = py + 'px';
   }
-
+  function spawnPlayerAtFirstPlatform() {
+    const firstPlat = platforms[0];
+    const marginAbove = 8; // SIGNIFICANT margin so player starts well above platform
+    px = firstPlat.x + (firstPlat.width / 2) - 16; // horizontally center the player on platform
+    py = firstPlat.y + platformHeight + marginAbove;
+    vy = 0;
+    cameraX = 0;
+    updatePlayerPos();
+    world.style.transform = 'translateX(0)';
+    keyPartSpotlight.style.transform = 'translateX(0)';
+    paperCup.style.opacity = '0';
+    cupActive = false;
+  }
   function gameLoop() {
     if(keyCollected) return;
-
     let newPx = px;
     if(keys.left) newPx -= moveSpeed;
     if(keys.right) newPx += moveSpeed;
-
     if(!horizontalCollisionCheck(newPx, py)) {
       px = newPx;
     }
-
     vy -= gravity;
     let newPy = py + vy;
-
     const landY = verticalCollisionCheck(px, newPy);
     if(landY !== null) {
       py = landY;
@@ -332,14 +319,11 @@
       py = newPy;
       onGround = false;
     }
-
     if(keys.up && onGround) {
       vy = jumpForce;
       onGround = false;
     }
-
     updatePlayerPos();
-
     if(px > window.innerWidth * 0.6) {
       cameraX = px - window.innerWidth * 0.6;
     }
@@ -347,12 +331,10 @@
     if(cameraX > worldWidth - window.innerWidth) cameraX = worldWidth - window.innerWidth;
     world.style.transform = `translateX(${-cameraX}px)`;
     keyPartSpotlight.style.transform = `translateX(${-cameraX}px)`;
-
     if(py < 0) {
       triggerFallScreen();
       return;
     }
-
     if(!cupActive && Math.random() < 0.003) {
       cupActive = true;
       cupX = window.innerWidth;
@@ -364,10 +346,8 @@
     if(cupActive) {
       cupX -= cupSpeed;
       paperCup.style.left = cupX + 'px';
-
       const playerRect = player.getBoundingClientRect();
       const cupRect = paperCup.getBoundingClientRect();
-
       if(!(cupRect.right < playerRect.left || cupRect.left > playerRect.right ||
           cupRect.bottom < playerRect.top || cupRect.top > playerRect.bottom)) {
         px -= 60;
@@ -377,13 +357,11 @@
         vy = 10;
         onGround = false;
       }
-
       if(cupX < -50) {
         cupActive = false;
         paperCup.style.opacity = '0';
       }
     }
-
     const keyRect = keyPartSpotlight.getBoundingClientRect();
     const playerRect = player.getBoundingClientRect();
     if(!keyCollected &&
@@ -391,32 +369,25 @@
          keyRect.bottom < playerRect.top || keyRect.top > playerRect.bottom)) {
       collectKeyPart();
     }
-
     requestAnimationFrame(gameLoop);
   }
-
   function collectKeyPart() {
     keyCollected = true;
     keyPartMessage.style.display = 'block';
   }
-
   continueBtn.onclick = () => {
     let keyParts = JSON.parse(localStorage.getItem('keyParts') || '[]');
     if(!keyParts.includes(1)) keyParts.push(1);
     localStorage.setItem('keyParts', JSON.stringify(keyParts));
-
     keyPartMessage.innerHTML = `You have ${keyParts.length} of 4 key parts!<br>Find the other ${4 - keyParts.length}.<br><br><button id="continueToSelect">Continue</button>`;
-
     document.getElementById('continueToSelect').onclick = () => {
       window.location.href = 'LVLSLCT.html';
     };
   };
-
   function triggerFallScreen() {
     fallOverlay.style.visibility = 'visible';
     fallOverlay.style.opacity = '1';
   }
-
   retryBtn.onclick = () => {
     fallOverlay.style.opacity = '0';
     setTimeout(() => {
@@ -425,25 +396,13 @@
       generatePlatforms();
       renderPlatforms();
       positionKeyPart();
-      const firstPlat = platforms[0];
-      const spawnMargin = 12; // spawn 12px above platform top to prevent clipping
-      px = firstPlat.x + 20;
-      py = firstPlat.y + platformHeight + spawnMargin;
-      vy = 0;
-      cameraX = 0;
-      updatePlayerPos();
-      world.style.transform = 'translateX(0)';
-      keyPartSpotlight.style.transform = 'translateX(0)';
-      paperCup.style.opacity = '0';
-      cupActive = false;
+      spawnPlayerAtFirstPlatform();
       gameLoop();
     }, 700);
   };
-
   returnBtn.onclick = () => {
     window.location.href = 'LVLSLCT.html';
   };
-
   window.addEventListener('keydown', e => {
     if(e.key === 'ArrowLeft') keys.left = true;
     else if(e.key === 'ArrowRight') keys.right = true;
@@ -454,18 +413,10 @@
     else if(e.key === 'ArrowRight') keys.right = false;
     else if(e.key === 'ArrowUp') keys.up = false;
   });
-
   generatePlatforms();
   renderPlatforms();
   positionKeyPart();
-
-  const firstPlat = platforms[0];
-  const marginAbovePlatform = 12;
-  px = firstPlat.x + 20;
-  py = firstPlat.y + platformHeight + marginAbovePlatform;
-  vy = 0;
-  updatePlayerPos();
-
+  spawnPlayerAtFirstPlatform();
   gameLoop();
 })();
 </script>
