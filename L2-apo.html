@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Level 2: Zombie Survival</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100vh; overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #555; /* Asphalt gray */
+    user-select: none;
+  }
+  #gameContainer {
+    position: relative;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    background: #444;
+    box-sizing: border-box;
+    border: 20px solid #ff4500; /* solid red-orange border */
+  }
+  #player {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: red;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(255,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  #gun {
+    position: absolute;
+    width: 40px;
+    height: 20px;
+    pointer-events: none;
+    user-select: none;
+    background: url('https://static.vecteezy.com/system/resources/thumbnails/035/929/646/small_2x/ai-generated-pistol-gun-isolated-on-transparent-background-ai-png.png') no-repeat center center;
+    background-size: contain;
+    transform-origin: left center;
+  }
+  .zombie {
+    position: absolute;
+    width: 28px; height: 28px;
+    background: green;
+    border-radius: 4px;
+    box-shadow: 0 0 6px rgba(0,200,0,0.6);
+  }
+  .bullet {
+    position: absolute;
+    width: 8px; height: 4px;
+    background: yellow;
+    border-radius: 2px;
+    z-index: 20;
+  }
+  #healthBarContainer {
+    position: fixed;
+    top: 15px; left: 15px;
+    width: 200px; height: 25px;
+    background: #222;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 0 8px #000;
+    z-index: 100;
+  }
+  #healthBar {
+    width: 100%;
+    height: 100%;
+    background: #e00;
+    transition: width 0.2s ease;
+  }
+  #reloadText {
+    position: absolute;
+    top: -30px; left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-shadow: 0 0 6px #000;
+    display: none;
+    user-select: none;
+  }
+  #deathOverlay, #winOverlay, #instructionsOverlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    font-size: 2rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    text-align: center;
+    user-select: none;
+  }
+  #deathOverlay img, #winOverlay img {
+    max-width: 300px;
+    margin-bottom: 20px;
+  }
+  #deathOverlay, #winOverlay {
+    display: none;
+  }
+  #instructionsOverlay {
+    background: rgba(0,0,0,0.95);
+    font-size: 1.3rem;
+    padding: 30px;
+  }
+  #instructionsOverlay button {
+    margin-top: 20px;
+    padding: 12px 30px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    background: #ffcc00;
+    color: black;
+    font-weight: bold;
+    box-shadow: 0 0 10px #ffcc00;
+    transition: background-color 0.3s;
+    user-select: none;
+  }
+  #instructionsOverlay button:hover {
+    background-color: #ffd633;
+  }
+</style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div id="player">
+      <div id="gun"></div>
+    </div>
+    <div id="reloadText">Reloading...</div>
+    <div id="healthBarContainer"><div id="healthBar"></div></div>
+  </div>
+  <!-- Death Screen with new GIF -->
+  <div id="deathOverlay">
+    <img src="https://media.tenor.com/LRFfePbSliMAAAAM/namztaes-monster.gif" alt="Killed by zombies gif" />
+    <div>You Were Killed By Zombies</div>
+  </div>
+  <!-- Win Screen -->
+  <div id="winOverlay">
+    <img src="https://media.tenor.com/wsbmWYxnJYQAAAAM/kermit-falling.gif" alt="Win gif" />
+    <div>You Survived!</div>
+    <button id="winContinueBtn">Continue</button>
+  </div>
+  <!-- Instructions Screen -->
+  <div id="instructionsOverlay">
+    <h2>Level 2 Instructions</h2>
+    <p>You are a red square with 100% health.<br>
+       Move with arrow keys.<br>
+       Press SPACE to shoot your gun.<br>
+       You have infinite ammo but must reload 2 seconds after every 10 shots.<br>
+       5 waves of green zombies will attack you.<br>
+       Each zombie that touches you reduces your health by 5.<br>
+       Kill all zombies in 5 waves to get the key part.<br>
+       Don’t touch the fiery border or you will burn alive!</p>
+    <button id="startBtn">Back</button>
+  </div>
+
+<script>
+(() => {
+  const container = document.getElementById('gameContainer');
+  const player = document.getElementById('player');
+  const gun = document.getElementById('gun');
+  const reloadText = document.getElementById('reloadText');
+  const healthBar = document.getElementById('healthBar');
+  const deathOverlay = document.getElementById('deathOverlay');
+  const winOverlay = document.getElementById('winOverlay');
+  const winContinueBtn = document.getElementById('winContinueBtn');
+  const instructionsOverlay = document.getElementById('instructionsOverlay');
+  const startBtn = document.getElementById('startBtn');
+
+  const playerSize = 32;
+  const playerSpeed = 5;
+  const bulletSpeed = 15;
+  const bulletSize = 8;
+  const zombieSize = 28;
+  const zombieSpeed = 1.5;
+  const maxShotsBeforeReload = 10;
+  const reloadDuration = 2000; // ms
+
+  let health = 100;
+  let keys = {left:false, right:false, up:false, down:false};
+  let isReloading = false;
+  let shotsFired = 0;
+
+  let playerX, playerY;
+  let bullets = [];
+  let zombies = [];
+  let wave = 0;
+  const maxWaves = 5;
+  let gameRunning = false;
+  const borderSize = 20;
+  const gameWidth = window.innerWidth - borderSize*2;
+  const gameHeight = window.innerHeight - borderSize*2;
+
+  let facingRight = true;
+
+  function getRandomZombieSpawn() {
+    const side = Math.floor(Math.random()*4);
+    switch(side) {
+      case 0: return {x: Math.random()*gameWidth, y: -zombieSize - 10};         // top
+      case 1: return {x: gameWidth + zombieSize + 10, y: Math.random()*gameHeight}; // right
+      case 2: return {x: Math.random()*gameWidth, y: gameHeight + zombieSize + 10}; // bottom
+      case 3: return {x: -zombieSize - 10, y: Math.random()*gameHeight};        // left
+    }
+  }
+
+  function clamp(value, min, max) { return Math.min(Math.max(value,min),max); }
+
+  function resetPlayer() {
+    playerX = gameWidth/2;
+    playerY = gameHeight/2;
+    health = 100;
+    updateHealthBar();
+    updatePlayerPosition();
+  }
+
+  function updatePlayerPosition() {
+    player.style.left = (playerX + borderSize) + 'px';
+    player.style.top = (playerY + borderSize) + 'px';
+    if(facingRight) {
+      gun.style.left = playerSize + 'px';
+      gun.style.top = '6px';
+      gun.style.transform = 'scaleX(1)';
+    } else {
+      gun.style.left = (-40) + 'px';
+      gun.style.top = '6px';
+      gun.style.transform = 'scaleX(-1)';
+    }
+  }
+
+  function fireBullet() {
+    if(isReloading) return;
+    shotsFired++;
+    if(shotsFired > maxShotsBeforeReload) {
+      startReloading();
+      return;
+    }
+    bullets.push({
+      x: facingRight ? playerX + playerSize : playerX - bulletSize,
+      y: playerY + playerSize/2 - 2,
+      width: bulletSize,
+      height: 4,
+      speed: facingRight ? bulletSpeed : -bulletSpeed,
+      element: null,
+    });
+  }
+
+  function startReloading() {
+    isReloading = true;
+    reloadText.style.display = 'block';
+    setTimeout(() => {
+      isReloading = false;
+      shotsFired = 0;
+      reloadText.style.display = 'none';
+    }, reloadDuration);
+  }
+
+  function spawnZombies(waveCount) {
+    zombies.forEach(z => { if(z.element) container.removeChild(z.element); });
+    zombies = [];
+    for(let i=0; i<waveCount; i++) {
+      let spawn = getRandomZombieSpawn();
+      let zombie = {x: spawn.x, y: spawn.y, health:50, element:null};
+      let zEl = document.createElement('div');
+      zEl.className = 'zombie';
+      container.appendChild(zEl);
+      zombie.element = zEl;
+      zombies.push(zombie);
+    }
+  }
+
+  function updateHealthBar() {
+    healthBar.style.width = health + '%';
+  }
+
+  function gameLoop() {
+    if(!gameRunning) return;
+
+    if(keys.left) {
+      playerX -= playerSpeed;
+      facingRight = false;
+    }
+    if(keys.right) {
+      playerX += playerSpeed;
+      facingRight = true;
+    }
+    if(keys.up) playerY -= playerSpeed;
+    if(keys.down) playerY += playerSpeed;
+
+    let burned = false;
+    if(playerX < 0) {
+      playerX = 0;
+      burned = true;
+    }
+    if(playerX > gameWidth - playerSize) {
+      playerX = gameWidth - playerSize;
+      burned = true;
+    }
+    if(playerY < 0) {
+      playerY = 0;
+      burned = true;
+    }
+    if(playerY > gameHeight - playerSize) {
+      playerY = gameHeight - playerSize;
+      burned = true;
+    }
+    if(burned) burnPlayer();
+
+    updatePlayerPosition();
+
+    // Move bullets and remove if offscreen
+    bullets.forEach((b, i) => {
+      b.x += b.speed;
+      if(!b.element) {
+        const el = document.createElement('div');
+        el.className = 'bullet';
+        container.appendChild(el);
+        b.element = el;
+      }
+      b.element.style.left = (b.x + borderSize) + 'px';
+      b.element.style.top = (b.y + borderSize) + 'px';
+      b.element.style.width = b.width + 'px';
+      b.element.style.height = b.height + 'px';
+
+      if(b.x > gameWidth + borderSize || b.x < -bulletSize) {
+        if(b.element) container.removeChild(b.element);
+        bullets.splice(i,1);
+      }
+    });
+
+    // Update zombies positions and check for player collision
+    zombies.forEach((z, i) => {
+      let dx = playerX - z.x;
+      let dy = playerY - z.y;
+      let dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist > 0) {
+        z.x += (dx/dist) * zombieSpeed;
+        z.y += (dy/dist) * zombieSpeed;
+      }
+      if(z.element) {
+        z.element.style.left = (z.x + borderSize) + 'px';
+        z.element.style.top = (z.y + borderSize) + 'px';
+      }
+      if(dist < (playerSize + zombieSize)/2) {
+        damagePlayer(5);
+        if(z.element) container.removeChild(z.element);
+        zombies.splice(i,1);
+      }
+    });
+
+    // Collision: bullets hitting zombies, bullets disappear immediately
+    bullets.forEach((b, bi) => {
+      zombies.forEach((z, zi) => {
+        if(b.x < z.x + zombieSize && b.x + b.width > z.x &&
+          b.y < z.y + zombieSize && b.y + b.height > z.y) {
+            z.health -= 5;
+            if(b.element) {
+              container.removeChild(b.element);
+            }
+            bullets.splice(bi,1);
+            if(z.health <= 0) {
+              if(z.element) container.removeChild(z.element);
+              zombies.splice(zi,1);
+            }
+        }
+      });
+    });
+
+    // Next wave or level complete
+    if(zombies.length === 0 && wave > 0) {
+      if(wave < maxWaves) {
+        wave++;
+        spawnZombies(wave*5);
+      } else {
+        endLevelWin();
+        return;
+      }
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function damagePlayer(amount) {
+    health -= amount;
+    if(health < 0) health = 0;
+    updateHealthBar();
+    if(health === 0) {
+      gameOverBurn(true);
+    }
+  }
+
+  function burnPlayer() {
+    if(!gameRunning) return;
+    gameOverBurn(false);
+  }
+
+  // Parameter indicates zombie kill or border burn death
+  function gameOverBurn(killedByZombies) {
+    gameRunning = false;
+    if(killedByZombies) {
+      deathOverlay.querySelector('img').src = "https://media.tenor.com/LRFfePbSliMAAAAM/namztaes-monster.gif";
+      deathOverlay.querySelector('div').textContent = "You Were Killed By Zombies";
+    } else {
+      deathOverlay.querySelector('img').src = "https://i.pinimg.com/originals/f9/6d/fb/f96dfb9f9d4e0b42af3888de8b9473a7.gif";
+      deathOverlay.querySelector('div').textContent = "You Burned Alive";
+    }
+    deathOverlay.style.display = 'flex';
+  }
+
+  function endLevelWin() {
+    gameRunning = false;
+    winOverlay.style.display = 'flex';
+    let keyParts = JSON.parse(localStorage.getItem('keyParts') || '[]');
+    if(!keyParts.includes(2)) keyParts.push(2);
+    localStorage.setItem('keyParts', JSON.stringify(keyParts));
+  }
+
+  function startLevel() {
+    resetPlayer();
+    wave = 1;
+    spawnZombies(wave*5);
+    health = 100;
+    updateHealthBar();
+    gameRunning = true;
+    bullets = [];
+    shotsFired = 0;
+    isReloading = false;
+    reloadText.style.display = 'none';
+    gameLoop();
+  }
+
+  window.addEventListener('keydown', e => {
+    if(e.code === 'ArrowLeft') { keys.left = true; facingRight = false; }
+    if(e.code === 'ArrowRight') { keys.right = true; facingRight = true; }
+    if(e.code === 'ArrowUp') keys.up = true;
+    if(e.code === 'ArrowDown') keys.down = true;
+    if(e.code === 'Space') fireBullet();
+  });
+  window.addEventListener('keyup', e => {
+    if(e.code === 'ArrowLeft') keys.left = false;
+    if(e.code === 'ArrowRight') keys.right = false;
+    if(e.code === 'ArrowUp') keys.up = false;
+    if(e.code === 'ArrowDown') keys.down = false;
+  });
+
+  startBtn.onclick = () => {
+    instructionsOverlay.style.display = 'none';
+    startLevel();
+  };
+  winContinueBtn.onclick = () => {
+    window.location.href = 'LVLSLCT.html';
+  };
+})();
+</script>
+</body>
+</html>
